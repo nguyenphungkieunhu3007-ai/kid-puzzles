@@ -1,0 +1,210 @@
+
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Block Blast Cute</title>
+<style>
+*{box-sizing:border-box}
+body{
+  margin:0;padding:20px 12px;
+  font-family:Arial,sans-serif;text-align:center;
+  color:#573b50;
+  background:linear-gradient(135deg,#fff0f6,#fff6d9);
+}
+h1{color:#ec6da5}
+#score{font-size:24px;font-weight:bold;margin:12px}
+#board{
+  display:grid;grid-template-columns:repeat(8,1fr);
+  gap:4px;width:min(92vw,440px);margin:18px auto;
+  padding:7px;background:#e9cddd;border-radius:12px;
+}
+.cell{aspect-ratio:1;background:#fff8fc;border-radius:5px}
+.cell.filled{background:var(--color)}
+#pieces{
+  display:flex;justify-content:center;align-items:center;
+  gap:18px;min-height:115px;flex-wrap:wrap;
+}
+.piece{display:grid;gap:3px;cursor:pointer;padding:6px}
+.piece.selected{outline:3px solid #ec6da5}
+.mini{width:23px;height:23px;border-radius:4px}
+button{
+  border:0;border-radius:20px;background:#ec6da5;
+  color:white;font-size:16px;padding:11px 20px;
+  cursor:pointer;margin:8px;
+}
+</style>
+</head>
+<body>
+<h1>🐱 BLOCK BLAST</h1>
+<p>Xếp khối, xóa hàng và ghi điểm!</p>
+<div id="score">Điểm: 0</div>
+<div id="board"></div>
+<h3>Chọn khối rồi chọn ô để đặt</h3>
+<div id="pieces"></div>
+<p id="message">Cố lên nha! 🌸</p>
+<button onclick="restart()">🔄 Chơi lại</button>
+
+<script>
+const N=8;
+const colors=["#ff85b3","#80c9ff","#b89aff",
+"#ffc857","#77dba5","#ff9c75"];
+const shapes=[
+[[0,0]],
+[[0,0],[0,1]],
+[[0,0],[1,0]],
+[[0,0],[0,1],[1,0],[1,1]],
+[[0,0],[1,0],[2,0]],
+[[0,0],[0,1],[0,2]],
+[[0,0],[0,1],[1,0]],
+[[0,0],[1,0],[1,1]],
+[[0,0],[0,1],[1,1]],
+[[0,0],[0,1],[0,2],[0,3]],
+[[0,0],[1,0],[2,0],[2,1]],
+[[0,0],[0,1],[1,0],[1,1],[2,0]]
+];
+
+let board,score,pieces,selected;
+
+function makeBoard(){
+  const el=document.getElementById("board");
+  el.innerHTML="";
+  for(let r=0;r<N;r++){
+    for(let c=0;c<N;c++){
+      const cell=document.createElement("div");
+      cell.className="cell";
+      cell.dataset.r=r;cell.dataset.c=c;
+      cell.onclick=()=>place(r,c);
+      el.appendChild(cell);
+    }
+  }
+  drawBoard();
+}
+
+function drawBoard(){
+  [...document.getElementById("board").children].forEach(el=>{
+    const v=board[+el.dataset.r][+el.dataset.c];
+    el.classList.toggle("filled",!!v);
+    el.style.setProperty("--color",v||"transparent");
+  });
+}
+
+function newPieces(){
+  pieces=Array.from({length:3},()=>({
+    shape:shapes[Math.floor(Math.random()*shapes.length)],
+    color:colors[Math.floor(Math.random()*colors.length)],
+    used:false
+  }));
+  selected=null;
+  drawPieces();
+}
+
+function drawPieces(){
+  const root=document.getElementById("pieces");
+  root.innerHTML="";
+  pieces.forEach((p,i)=>{
+    const h=Math.max(...p.shape.map(a=>a[0]))+1;
+    const w=Math.max(...p.shape.map(a=>a[1]))+1;
+    const el=document.createElement("div");
+    el.className="piece"+(selected===i?" selected":"");
+    el.style.gridTemplateColumns=`repeat(${w},23px)`;
+    if(p.used){el.style.visibility="hidden"}
+    for(let r=0;r<h;r++){
+      for(let c=0;c<w;c++){
+        const m=document.createElement("div");
+        m.className="mini";
+        if(p.shape.some(a=>a[0]===r&&a[1]===c)){
+          m.style.background=p.color;
+        }else{m.style.visibility="hidden"}
+        el.appendChild(m);
+      }
+    }
+    el.onclick=()=>{
+      if(p.used)return;
+      selected=i;drawPieces();
+      document.getElementById("message").textContent=
+      "Đã chọn khối! Chọn ô bắt đầu nha.";
+    };
+    root.appendChild(el);
+  });
+}
+
+function canPlace(shape,r,c){
+  return shape.every(([dr,dc])=>{
+    const y=r+dr,x=c+dc;
+    return y>=0&&y<N&&x>=0&&x<N&&!board[y][x];
+  });
+}
+
+function place(r,c){
+  if(selected===null){
+    document.getElementById("message").textContent="Hãy chọn khối trước!";
+    return;
+  }
+  const p=pieces[selected];
+  if(p.used)return;
+  if(!canPlace(p.shape,r,c)){
+    document.getElementById("message").textContent=
+    "Khối không vừa ở đây, thử chỗ khác nha!";
+    return;
+  }
+
+  p.shape.forEach(([dr,dc])=>board[r+dr][c+dc]=p.color);
+  score+=p.shape.length;
+  let rows=[],cols=[];
+
+  for(let y=0;y<N;y++){
+    if(board[y].every(Boolean))rows.push(y);
+  }
+  for(let x=0;x<N;x++){
+    if(board.every(row=>row[x]))cols.push(x);
+  }
+
+  rows.forEach(y=>{
+    for(let x=0;x<N;x++)board[y][x]=null;
+  });
+  cols.forEach(x=>{
+    for(let y=0;y<N;y++)board[y][x]=null;
+  });
+
+  score+=(rows.length+cols.length)*10;
+  p.used=true;
+  selected=null;
+  document.getElementById("score").textContent="Điểm: "+score;
+  drawBoard();
+
+  if(pieces.every(p=>p.used))newPieces();
+  else drawPieces();
+
+  if(!pieces.some(p=>!p.used&&hasMove(p.shape))){
+    document.getElementById("message").textContent=
+    "Hết nước đi! Bấm Chơi lại nha 🐱";
+  }else{
+    document.getElementById("message").textContent=
+    rows.length+cols.length?"Tuyệt vời! Đã xóa hàng/cột ✨":"Đặt khối thành công!";
+  }
+}
+
+function hasMove(shape){
+  for(let r=0;r<N;r++){
+    for(let c=0;c<N;c++){
+      if(canPlace(shape,r,c))return true;
+    }
+  }
+  return false;
+}
+
+function restart(){
+  board=Array.from({length:N},()=>Array(N).fill(null));
+  score=0;selected=null;
+  document.getElementById("score").textContent="Điểm: 0";
+  document.getElementById("message").textContent="Cố lên nha! 🌸";
+  makeBoard();
+  newPieces();
+}
+
+restart();
+</script>
+</body>
+</html>
