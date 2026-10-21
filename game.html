@@ -4,207 +4,182 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Block Blast Cute</title>
+<title>Block Puzzle</title>
 <style>
-*{box-sizing:border-box}
-body{
-  margin:0;padding:20px 12px;
-  font-family:Arial,sans-serif;text-align:center;
-  color:#573b50;
-  background:linear-gradient(135deg,#fff0f6,#fff6d9);
-}
-h1{color:#ec6da5}
-#score{font-size:24px;font-weight:bold;margin:12px}
-#board{
-  display:grid;grid-template-columns:repeat(8,1fr);
-  gap:4px;width:min(92vw,440px);margin:18px auto;
-  padding:7px;background:#e9cddd;border-radius:12px;
-}
-.cell{aspect-ratio:1;background:#fff8fc;border-radius:5px}
-.cell.filled{background:var(--color)}
-#pieces{
-  display:flex;justify-content:center;align-items:center;
-  gap:18px;min-height:115px;flex-wrap:wrap;
-}
-.piece{display:grid;gap:3px;cursor:pointer;padding:6px}
-.piece.selected{outline:3px solid #ec6da5}
-.mini{width:23px;height:23px;border-radius:4px}
-button{
-  border:0;border-radius:20px;background:#ec6da5;
-  color:white;font-size:16px;padding:11px 20px;
-  cursor:pointer;margin:8px;
-}
+body{margin:0;padding:12px;background:#10131c;color:white;font-family:Arial,sans-serif}
+.wrap{max-width:600px;margin:auto}
+.stats{display:flex;gap:8px;margin-bottom:12px}
+.stat{flex:1;background:#202638;border-radius:12px;padding:10px;text-align:center}
+.stat small{display:block;color:#b8c0d6}.stat b{font-size:22px}
+#progress{height:7px;background:#30374b;border-radius:9px;margin-bottom:12px;overflow:hidden}
+#bar{height:100%;background:#8b7cff;width:0}
+#board{display:grid;grid-template-columns:repeat(8,1fr);gap:4px;background:#171c28;padding:7px;border-radius:12px;touch-action:none}
+.cell{aspect-ratio:1;background:#293044;border-radius:4px}
+.filled{background:var(--c)}
+.preview{background:#53d6c5!important}
+.bad{background:#f06b7d!important}
+#pieces{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.piece{height:100px;background:#202638;border-radius:12px;display:flex;align-items:center;justify-content:center;touch-action:none;cursor:grab}
+.piece.used{opacity:.2;pointer-events:none}
+.shape{display:grid;gap:4px;pointer-events:none}
+.mini{width:20px;height:20px;background:var(--c);border-radius:4px}
+.empty{background:transparent}
+button{padding:10px 14px;margin:12px 4px 0 0;border:0;border-radius:9px;background:#8b7cff;color:white;font-weight:bold;cursor:pointer}
+#message{display:none;background:#202638;padding:14px;margin-top:12px;border-radius:12px;text-align:center}
+#ghost{position:fixed;z-index:9999;pointer-events:none;display:grid;gap:4px;opacity:.9}
 </style>
 </head>
 <body>
-<h1>🐱 BLOCK BLAST</h1>
-<p>Xếp khối, xóa hàng và ghi điểm!</p>
-<div id="score">Điểm: 0</div>
-<div id="board"></div>
-<h3>Chọn khối rồi chọn ô để đặt</h3>
-<div id="pieces"></div>
-<p id="message">Cố lên nha! 🌸</p>
-<button onclick="restart()">🔄 Chơi lại</button>
-
+<div class="wrap">
+  <div class="stats">
+    <div class="stat"><small>MÀN</small><b id="level">1</b></div>
+    <div class="stat"><small>ĐIỂM</small><b id="score">0</b></div>
+    <div class="stat"><small>MỤC TIÊU</small><b id="target">100</b></div>
+  </div>
+  <div id="progress"><div id="bar"></div></div>
+  <div id="board"></div>
+  <p>Kéo khối bên dưới vào bảng bằng chuột.</p>
+  <div id="pieces"></div>
+  <div id="message">
+    <h3 id="msgTitle"></h3><p id="msgText"></p>
+    <button id="continue">Tiếp tục</button>
+  </div>
+  <button onclick="restart()">Chơi lại màn</button>
+  <button onclick="resetGame()">Về màn 1</button>
+</div>
 <script>
-const N=8;
-const colors=["#ff85b3","#80c9ff","#b89aff",
-"#ffc857","#77dba5","#ff9c75"];
+const SIZE=8;
+const targets=[100,180,280,400,550,720,920,1150,1400,1700,2050,2450,2900,3400,4000];
+const colors=["#7c83ff","#49c9b0","#ffb454","#ff6e91","#65b8ff","#b77bff"];
 const shapes=[
-[[0,0]],
-[[0,0],[0,1]],
-[[0,0],[1,0]],
-[[0,0],[0,1],[1,0],[1,1]],
-[[0,0],[1,0],[2,0]],
-[[0,0],[0,1],[0,2]],
-[[0,0],[0,1],[1,0]],
-[[0,0],[1,0],[1,1]],
-[[0,0],[0,1],[1,1]],
-[[0,0],[0,1],[0,2],[0,3]],
-[[0,0],[1,0],[2,0],[2,1]],
-[[0,0],[0,1],[1,0],[1,1],[2,0]]
+ [[1]],[[1,1]],[[1,1,1]],[[1,1,1,1]],[[1,1],[1,1]],
+ [[1,0],[1,0],[1,1]],[[0,1],[0,1],[1,1]],[[1,1,1],[0,1,0]],
+ [[1,1,1],[1,0,0]],[[1,1,1],[0,0,1]],[[1,1,0],[0,1,1]],
+ [[1,0,0],[1,1,1]],[[0,0,1],[1,1,1]]
 ];
-
-let board,score,pieces,selected;
-
-function makeBoard(){
-  const el=document.getElementById("board");
-  el.innerHTML="";
-  for(let r=0;r<N;r++){
-    for(let c=0;c<N;c++){
-      const cell=document.createElement("div");
-      cell.className="cell";
-      cell.dataset.r=r;cell.dataset.c=c;
-      cell.onclick=()=>place(r,c);
-      el.appendChild(cell);
-    }
-  }
-  drawBoard();
+let grid,score,level,pieces,selected=-1,drag=null,won=false;
+const el=id=>document.getElementById(id);
+function goal(){return targets[Math.min(level-1,targets.length-1)]+Math.max(0,level-targets.length)*500}
+function randomPiece(){
+ let shape=shapes[Math.floor(Math.random()*shapes.length)];
+ return {shape:shape.map(r=>r.slice()),color:colors[Math.floor(Math.random()*colors.length)],used:false};
 }
-
-function drawBoard(){
-  [...document.getElementById("board").children].forEach(el=>{
-    const v=board[+el.dataset.r][+el.dataset.c];
-    el.classList.toggle("filled",!!v);
-    el.style.setProperty("--color",v||"transparent");
-  });
+function init(first=false){
+ if(first)level=1;
+ grid=Array.from({length:SIZE},()=>Array(SIZE).fill(null));
+ score=0;won=false;hideMessage();newPieces();render();
 }
-
-function newPieces(){
-  pieces=Array.from({length:3},()=>({
-    shape:shapes[Math.floor(Math.random()*shapes.length)],
-    color:colors[Math.floor(Math.random()*colors.length)],
-    used:false
+function newPieces(){pieces=[randomPiece(),randomPiece(),randomPiece()];selected=-1;renderPieces()}
+function render(){
+ el("level").textContent=level;el("score").textContent=score;el("target").textContent=goal();
+ el("bar").style.width=Math.min(100,score/goal()*100)+"%";
+ const board=el("board");board.innerHTML="";
+ grid.forEach((row,r)=>row.forEach((color,c)=>{
+  const cell=document.createElement("div");cell.className="cell"+(color?" filled":"");
+  if(color)cell.style.setProperty("--c",color);
+  cell.dataset.r=r;cell.dataset.c=c;board.appendChild(cell);
+ }));
+ renderPieces();
+}
+function renderPieces(){
+ const root=el("pieces");root.innerHTML="";
+ pieces.forEach((p,i)=>{
+  const box=document.createElement("div");box.className="piece"+(p.used?" used":"");
+  box.dataset.i=i;
+  const shape=document.createElement("div");shape.className="shape";
+  shape.style.gridTemplateColumns=`repeat(${p.shape[0].length},20px)`;
+  p.shape.forEach(row=>row.forEach(v=>{
+   const d=document.createElement("div");d.className="mini"+(!v?" empty":"");
+   d.style.setProperty("--c",p.color);shape.appendChild(d);
   }));
-  selected=null;
-  drawPieces();
+  box.appendChild(shape);root.appendChild(box);
+ });
 }
-
-function drawPieces(){
-  const root=document.getElementById("pieces");
-  root.innerHTML="";
-  pieces.forEach((p,i)=>{
-    const h=Math.max(...p.shape.map(a=>a[0]))+1;
-    const w=Math.max(...p.shape.map(a=>a[1]))+1;
-    const el=document.createElement("div");
-    el.className="piece"+(selected===i?" selected":"");
-    el.style.gridTemplateColumns=`repeat(${w},23px)`;
-    if(p.used){el.style.visibility="hidden"}
-    for(let r=0;r<h;r++){
-      for(let c=0;c<w;c++){
-        const m=document.createElement("div");
-        m.className="mini";
-        if(p.shape.some(a=>a[0]===r&&a[1]===c)){
-          m.style.background=p.color;
-        }else{m.style.visibility="hidden"}
-        el.appendChild(m);
-      }
-    }
-    el.onclick=()=>{
-      if(p.used)return;
-      selected=i;drawPieces();
-      document.getElementById("message").textContent=
-      "Đã chọn khối! Chọn ô bắt đầu nha.";
-    };
-    root.appendChild(el);
-  });
-}
-
 function canPlace(shape,r,c){
-  return shape.every(([dr,dc])=>{
-    const y=r+dr,x=c+dc;
-    return y>=0&&y<N&&x>=0&&x<N&&!board[y][x];
-  });
+ for(let y=0;y<shape.length;y++)for(let x=0;x<shape[y].length;x++)
+  if(shape[y][x]&&(r+y<0||c+x<0||r+y>=SIZE||c+x>=SIZE||grid[r+y][c+x]))return false;
+ return true;
 }
-
-function place(r,c){
-  if(selected===null){
-    document.getElementById("message").textContent="Hãy chọn khối trước!";
-    return;
-  }
-  const p=pieces[selected];
-  if(p.used)return;
-  if(!canPlace(p.shape,r,c)){
-    document.getElementById("message").textContent=
-    "Khối không vừa ở đây, thử chỗ khác nha!";
-    return;
-  }
-
-  p.shape.forEach(([dr,dc])=>board[r+dr][c+dc]=p.color);
-  score+=p.shape.length;
-  let rows=[],cols=[];
-
-  for(let y=0;y<N;y++){
-    if(board[y].every(Boolean))rows.push(y);
-  }
-  for(let x=0;x<N;x++){
-    if(board.every(row=>row[x]))cols.push(x);
-  }
-
-  rows.forEach(y=>{
-    for(let x=0;x<N;x++)board[y][x]=null;
-  });
-  cols.forEach(x=>{
-    for(let y=0;y<N;y++)board[y][x]=null;
-  });
-
-  score+=(rows.length+cols.length)*10;
-  p.used=true;
-  selected=null;
-  document.getElementById("score").textContent="Điểm: "+score;
-  drawBoard();
-
-  if(pieces.every(p=>p.used))newPieces();
-  else drawPieces();
-
-  if(!pieces.some(p=>!p.used&&hasMove(p.shape))){
-    document.getElementById("message").textContent=
-    "Hết nước đi! Bấm Chơi lại nha 🐱";
-  }else{
-    document.getElementById("message").textContent=
-    rows.length+cols.length?"Tuyệt vời! Đã xóa hàng/cột ✨":"Đặt khối thành công!";
-  }
+function place(i,r,c){
+ const p=pieces[i];if(!p||p.used||won||!canPlace(p.shape,r,c))return false;
+ let count=0;
+ p.shape.forEach((row,y)=>row.forEach((v,x)=>{if(v){grid[r+y][c+x]=p.color;count++}}));
+ score+=count;p.used=true;
+ let rows=[],cols=[];
+ for(let y=0;y<SIZE;y++)if(grid[y].every(Boolean))rows.push(y);
+ for(let x=0;x<SIZE;x++)if(grid.every(row=>row[x]))cols.push(x);
+ rows.forEach(y=>grid[y].fill(null));
+ cols.forEach(x=>grid.forEach(row=>row[x]=null));
+ score+=(rows.length+cols.length)*10;
+ if(score>=goal()){
+  won=true;render();
+  message("🎉 Qua màn thành công!",`Bà đạt ${score} điểm! Màn ${level+1} đã mở.`,`Tiếp tục`,nextLevel);
+  return true;
+ }
+ if(pieces.every(q=>q.used))newPieces();
+ render();
+ if(!pieces.some(q=>!q.used&&hasMove(q.shape)))
+  message("Hết chỗ rồi!",`Điểm: ${score}. Bà có thể chơi lại màn này.`,`Chơi lại`,restart);
+ return true;
 }
-
 function hasMove(shape){
-  for(let r=0;r<N;r++){
-    for(let c=0;c<N;c++){
-      if(canPlace(shape,r,c))return true;
-    }
-  }
-  return false;
+ for(let r=0;r<SIZE;r++)for(let c=0;c<SIZE;c++)if(canPlace(shape,r,c))return true;
+ return false;
 }
-
-function restart(){
-  board=Array.from({length:N},()=>Array(N).fill(null));
-  score=0;selected=null;
-  document.getElementById("score").textContent="Điểm: 0";
-  document.getElementById("message").textContent="Cố lên nha! 🌸";
-  makeBoard();
-  newPieces();
+function cellAt(x,y){const e=document.elementFromPoint(x,y);return e&&e.closest(".cell")}
+function clearPreview(){document.querySelectorAll(".preview,.bad").forEach(e=>e.classList.remove("preview","bad"))}
+function preview(x,y){
+ clearPreview();if(!drag)return;
+ const cell=cellAt(x,y);if(!cell)return;
+ const r=+cell.dataset.r,c=+cell.dataset.c,ok=canPlace(pieces[drag.i].shape,r,c);
+ pieces[drag.i].shape.forEach((row,dy)=>row.forEach((v,dx)=>{
+  if(!v)return;
+  const targetCell=document.querySelector(`.cell[data-r="${r+dy}"][data-c="${c+dx}"]`);
+  if(targetCell)targetCell.classList.add(ok?"preview":"bad");
+ }));
 }
-
-restart();
+function startDrag(i,x,y){
+ if(pieces[i].used||won)return;
+ selected=i;drag={i,x0:x,y0:y,moved:false};
+ const ghost=document.createElement("div");ghost.id="ghost";
+ ghost.style.gridTemplateColumns=`repeat(${pieces[i].shape[0].length},20px)`;
+ pieces[i].shape.forEach(row=>row.forEach(v=>{
+  const d=document.createElement("div");d.className="mini"+(!v?" empty":"");
+  d.style.setProperty("--c",pieces[i].color);ghost.appendChild(d);
+ }));
+ document.body.appendChild(ghost);moveGhost(x,y);
+}
+function moveGhost(x,y){const g=el("ghost");if(g){g.style.left=x+12+"px";g.style.top=y+12+"px"}}
+function endDrag(x,y){
+ if(!drag)return;
+ const i=drag.i,cell=cellAt(x,y),moved=drag.moved;
+ el("ghost")?.remove();clearPreview();drag=null;
+ if(cell)place(i,+cell.dataset.r,+cell.dataset.c);
+ else if(!moved){selected=i;renderPieces()}
+}
+document.addEventListener("pointerdown",e=>{
+ const box=e.target.closest(".piece");if(!box)return;
+ startDrag(+box.dataset.i,e.clientX,e.clientY);
+});
+document.addEventListener("pointermove",e=>{
+ if(!drag)return;
+ if(Math.abs(e.clientX-drag.x0)+Math.abs(e.clientY-drag.y0)>4)drag.moved=true;
+ moveGhost(e.clientX,e.clientY);preview(e.clientX,e.clientY);
+});
+document.addEventListener("pointerup",e=>endDrag(e.clientX,e.clientY));
+el("board").addEventListener("click",e=>{
+ const cell=e.target.closest(".cell");if(cell&&selected>=0&&!drag)place(selected,+cell.dataset.r,+cell.dataset.c);
+});
+function message(title,txt,button,fn){
+ el("msgTitle").textContent=title;el("msgText").textContent=txt;
+ el("continue").textContent=button;el("message").style.display="block";el("continue").onclick=fn;
+}
+function hideMessage(){el("message").style.display="none"}
+function nextLevel(){level++;init(false)}
+function restart(){init(false)}
+function resetGame(){init(true)}
+window.restart=restart;window.resetGame=resetGame;
+init(true);
 </script>
 </body>
 </html>
